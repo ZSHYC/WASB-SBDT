@@ -193,6 +193,12 @@ class Tennis(object):
                     if frame_name.endswith(self._ext):
                         frame_names.append(frame_name)
                 frame_names.sort()
+                
+                # 检查是否有足够的帧来构建序列，如果没有则跳过此片段
+                if len(frame_names) < self._frames_in or len(ball_xyvs) < self._frames_in:
+                    log.warning(f"Skipping clip {match}/{clip_name} due to insufficient frames: {len(frame_names)} frame files, {len(ball_xyvs)} annotations, required {self._frames_in}")
+                    continue
+                
                 num_frames         += len(frame_names)
                 num_frames_with_gt += len(ball_xyvs)
                 
@@ -200,12 +206,14 @@ class Tennis(object):
                     ball_xyvs = refine_gt_clip(ball_xyvs, clip_frame_dir, frame_names, refine_npz_path)
 
                 for i in range(len(ball_xyvs)-self._frames_in+1):
-                    names = frame_names[i:i+self._frames_in]
-                    paths = [ osp.join(clip_frame_dir, name) for name in names]
-                    annos = [ ball_xyvs[j] for j in range(i+self._frames_in-self._frames_out, i+self._frames_in)]
-                    seq_list.append( {'frames': paths, 'annos': annos, 'match': match, 'clip': clip_name})
-                    if i%self._step==0:
-                        clip_seq_list.append( {'frames': paths, 'annos': annos, 'match': match, 'clip': clip_name})
+                    # 添加额外检查，确保frame_names有足够的帧
+                    if i + self._frames_in <= len(frame_names):
+                        names = frame_names[i:i+self._frames_in]
+                        paths = [ osp.join(clip_frame_dir, name) for name in names]
+                        annos = [ ball_xyvs[j] for j in range(i+self._frames_in-self._frames_out, i+self._frames_in)]
+                        seq_list.append( {'frames': paths, 'annos': annos, 'match': match, 'clip': clip_name})
+                        if i%self._step==0:
+                            clip_seq_list.append( {'frames': paths, 'annos': annos, 'match': match, 'clip': clip_name})
                 
                 clip_disps = []
                 # compute displacement between consecutive frames
@@ -218,8 +226,12 @@ class Tennis(object):
                         clip_disps.append(disp)
 
                 for i in range(len(ball_xyvs)):
-                    path     = osp.join(clip_frame_dir, frame_names[i])
-                    clip_seq_gt_dict[path] = ball_xyvs[i]['center']
+                    if i < len(frame_names):  # 添加边界检查
+                        path     = osp.join(clip_frame_dir, frame_names[i])
+                        clip_seq_gt_dict[path] = ball_xyvs[i]['center']
+                    else:
+                        # 如果帧文件数量少于CSV中的条目，跳过剩余的ball_xyvs条目
+                        break
 
                 clip_seq_list_dict[(match, clip_name)]    = clip_seq_list
                 clip_seq_gt_dict_dict[(match, clip_name)] = clip_seq_gt_dict
