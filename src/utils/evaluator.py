@@ -110,6 +110,9 @@ class Evaluator(object):
 
     @property
     def ap(self):
+        if (self.tp_all + self.fn_all) == 0:
+            return 0.0  # 如果没有正样本，AP为0
+        
         inds = np.argsort(-1 * np.array(self._scores)).tolist()
         tp   = 0
         r2p  = {}
@@ -131,7 +134,7 @@ class Evaluator(object):
 
     @property
     def rmse(self):
-        _rmse = - np.Inf
+        _rmse = - np.inf
         if len(self.sq_errs) > 0:
             _rmse = np.sqrt(np.array(self.sq_errs).mean())
         return _rmse

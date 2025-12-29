@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 __dataset_factory = {
     'soccer': Soccer,
     'tennis': Tennis,
+    'tennis_predict': Tennis,  # 添加这一行，将tennis_predict映射到Tennis类
     'badminton': Badminton,
     'volleyball': Volleyball,
     'basketball': Basketball,
@@ -25,6 +26,7 @@ __dataset_factory = {
 __video_clip_factory = {
     'badminton': get_badminton_clips,
     'tennis': get_tennis_clips,
+    'tennis_predict': get_tennis_clips,  # 添加这一行，将tennis_predict映射到get_tennis_clips函数
     'volleyball': get_volleyball_clips,
     'soccer': get_soccer_clips,
     'basketball': get_basketball_clips,

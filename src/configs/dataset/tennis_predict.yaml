@@ -1,0 +1,17 @@
+name: tennis_predict
+ext: '.jpg'
+root_dir: ../datasets/tennis_predict
+csv_filename: 'Label.csv'
+visible_flags: [1,2]
+train:
+  matches: [ ]  # 训练集为空
+  num_clip_ratio: 1.0
+  refine_npz_path: 
+test:
+  # matches: [ 'game_1','game_2','game_3' ]  # 或者 [ 'game_1', 'game_2' ] 如果有多个
+  matches: 'all'          # 如果 matches 是 'all'，则自动获取根目录下的所有子目录
+  num_clip_ratio: 1.0
+  refine_npz_path:
+
+# python3 src/main.py --config-name=eval dataset=tennis_new model=wasb detector.model_path=../pretrained_weights/wasb_tennis_best.pth.tar runner.split=test
+

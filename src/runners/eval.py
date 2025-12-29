@@ -13,6 +13,7 @@ import torch
 from torch import nn
 import cv2
 import matplotlib.pyplot as plt
+import pandas as pd  # 添加pandas导入用于保存CSV
 
 from dataloaders import build_dataloader
 from detectors import build_detector
@@ -75,6 +76,25 @@ def inference_video(detector,
     # +---------------
     log.info('Time:{:.1f}(sec)'.format(t_elapsed))
 
+    # 创建预测结果列表用于保存到CSV
+    csv_predictions = []
+    for img_path, result in result_dict.items():
+        # 从图像路径提取文件名
+        filename = osp.basename(img_path)
+        x_pred = result['x']
+        y_pred = result['y']
+        visi_pred = result['visi']
+        score_pred = result['score']
+        
+        # 将预测结果添加到列表
+        csv_predictions.append({
+            'file name': filename,
+            'x-coordinate': x_pred,
+            'y-coordinate': y_pred,
+            'visibility': 1 if visi_pred else 0,
+            'score': score_pred
+        })
+
     cm_pred = plt.get_cmap('Reds', len(result_dict))
     cm_gt   = plt.get_cmap('Greens', len(result_dict))
 
@@ -112,14 +132,20 @@ def inference_video(detector,
                 visi_pred  = result_dict[img_path2]['visi']
                 score_pred = result_dict[img_path2]['score']
                 
-                center_gt = gt[img_path2]
+                # 处理没有真实值数据的情况
+                center_gt = None
+                if gt is not None:
+                    center_gt = gt[img_path2]
 
                 color_pred = (int(cm_pred(cnt2)[2]*255), int(cm_pred(cnt2)[1]*255), int(cm_pred(cnt2)[0]*255))
                 color_gt   = (int(cm_gt(cnt2)[2]*255), int(cm_gt(cnt2)[1]*255), int(cm_gt(cnt2)[0]*255))
-                vis_gt     = draw_frame(vis_gt, 
-                                    center = center_gt, 
-                                    color = color_gt,
-                                    radius=8)
+                
+                # 只有在有真实值数据时才绘制真实值
+                if center_gt is not None:
+                    vis_gt = draw_frame(vis_gt, 
+                                center = center_gt, 
+                                color = color_gt,
+                                radius=8)
 
                 vis_pred   = draw_frame(vis_pred, 
                                     center = Center(is_visible=visi_pred, x=x_pred, y=y_pred), 
@@ -127,24 +153,37 @@ def inference_video(detector,
                                     radius=8)
 
             vis = np.hstack((vis_gt, vis_pred))
-            cv2.imwrite(vis_frame_path, vis)
+            # 确保目录存在后再保存图像
+            if vis_frame_path:
+                mkdir_if_missing(os.path.dirname(vis_frame_path))
+                success = cv2.imwrite(vis_frame_path, vis)
+                if not success:
+                    log.warning(f'Failed to write image to {vis_frame_path}')
 
-        if vis_traj_path is not None:
-            color_pred = (int(cm_pred(cnt)[2]*255), int(cm_pred(cnt)[1]*255), int(cm_pred(cnt)[0]*255))
-            color_gt   = (int(cm_gt(cnt)[2]*255), int(cm_gt(cnt)[1]*255), int(cm_gt(cnt)[0]*255))
-            vis        = visualizer.draw_frame(vis, 
-                                               center_gt=center_gt, 
-                                               color_gt=color_gt,
-                        )
+        # if vis_traj_path is not None:
+        #     color_pred = (int(cm_pred(cnt)[2]*255), int(cm_pred(cnt)[1]*255), int(cm_pred(cnt)[0]*255))
+        #     color_gt   = (int(cm_gt(cnt)[2]*255), int(cm_gt(cnt)[1]*255), int(cm_gt(cnt)[0]*255))
+        #     vis        = visualizer.draw_frame(vis, 
+        #                                        center_gt=center_gt, 
+        #                                        color_gt=color_gt,
+        #                 )
 
+    # 检查可视化目录中是否有图像文件，避免gen_video函数出错
     if vis_frame_dir is not None:
-        video_path = '{}.mp4'.format(vis_frame_dir)
-        gen_video(video_path, vis_frame_dir, fps=25.0)
+        if os.path.exists(vis_frame_dir):
+            image_files = [f for f in os.listdir(vis_frame_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
+            if len(image_files) > 0:
+                video_path = '{}.mp4'.format(vis_frame_dir)
+                gen_video(video_path, vis_frame_dir, fps=25.0)
+            else:
+                log.info(f'No image files found in {vis_frame_dir}, skipping video generation.')
+        else:
+            log.info(f'Visualization directory {vis_frame_dir} does not exist, skipping video generation.')
 
     if evaluator is not None:
         evaluator.print_results(with_ap=False)
 
-    return fp1_im_list, {'t_elapsed': t_elapsed, 'num_frames': num_frames}
+    return fp1_im_list, {'t_elapsed': t_elapsed, 'num_frames': num_frames, 'predictions': csv_predictions}
 
 class VideosInferenceRunner(BaseRunner):
     def __init__(self,
@@ -186,6 +225,9 @@ class VideosInferenceRunner(BaseRunner):
         t_elapsed_all = 0.
         num_frames_all   = 0
         fp1_im_list_dict = {}
+        # 使用字典存储每个game的预测结果
+        game_predictions = {}
+        
         for key, dataloader_and_gt in self._clip_loaders_and_gts.items():
             match, clip_name = key
             dataloader = dataloader_and_gt['clip_loader']
@@ -218,6 +260,19 @@ class VideosInferenceRunner(BaseRunner):
             
             t_elapsed_all += tmp['t_elapsed']
             num_frames_all += tmp['num_frames']
+            
+            # 将当前match的预测结果添加到字典中
+            if match not in game_predictions:
+                game_predictions[match] = []
+            game_predictions[match].extend(tmp['predictions'])
+
+        # 为每个game保存独立的CSV文件
+        for match, predictions in game_predictions.items():
+            if predictions:  # 只有当有预测结果时才保存
+                csv_path = osp.join(self._output_dir, f'{match}_predictions.csv')
+                df = pd.DataFrame(predictions)
+                df.to_csv(csv_path, index=False)
+                log.info(f'Predictions for {match} saved to {csv_path}')
 
         log.info('-- TOTAL --')
         evaluator.print_results(txt='{} @ dist_threshold={}'.format(self._cfg['model']['name'], evaluator.dist_threshold), 
@@ -230,4 +285,3 @@ class VideosInferenceRunner(BaseRunner):
                 'accuracy': evaluator.accuracy, 
                 'rmse': evaluator.rmse, 
                 'fp1_im_list_dict': fp1_im_list_dict}
-

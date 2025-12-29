@@ -1,6 +1,7 @@
 name: tennis
 ext: '.jpg'
-root_dir: /root/datasets/tennis
+# root_dir: /root/datasets/tennis  #linux
+root_dir: ../datasets/tennis
 csv_filename: 'Label.csv'
 visible_flags: [1,2]
 train:

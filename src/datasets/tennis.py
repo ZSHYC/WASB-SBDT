@@ -159,6 +159,11 @@ class Tennis(object):
                       num_clip_ratio, 
                       refine_npz_path=None,
     ):
+        # 如果 matches 是 'all'，则自动获取根目录下的所有子目录
+        if matches == 'all' or matches == ['all']:
+            matches = [d for d in os.listdir(self._root_dir) 
+                      if os.path.isdir(os.path.join(self._root_dir, d))]
+        
         if refine_npz_path is not None:
             log.info('refine gt ball positions with {}'.format(refine_npz_path))
 

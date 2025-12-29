@@ -33,7 +33,8 @@ class RandomSampler(Sampler):
         for i in range(len(self._idxs)//self._batch_size):
             ret.append( self._idxs[i*self._batch_size:(i+1)*self._batch_size])
         if (not self._drop_last) and (len(self._idxs)%self._batch_size !=0):
-            ret.append( self._idxs[(i+1)*self._batch_size:])
+            start_idx = (len(self._idxs)//self._batch_size)*self._batch_size
+            ret.append( self._idxs[start_idx:])
         return iter(ret)
 
     def __len__(self):
@@ -69,8 +70,9 @@ class MatchSampler(Sampler):
                 random.shuffle(idxs)
             for i in range(len(idxs)//self._batch_size):
                 ret.append( idxs[i*self._batch_size:(i+1)*self._batch_size])
-            if not self._drop_last:
-                ret.append( idxs[i*self._batch_size:])
+            if not self._drop_last and len(idxs) % self._batch_size != 0:
+                start_idx = (len(idxs)//self._batch_size)*self._batch_size
+                ret.append( idxs[start_idx:])
         if self._shuffle_batch:
             random.shuffle(ret)
         return iter(ret)
@@ -110,8 +112,9 @@ class ClipSampler(Sampler):
                 random.shuffle(idxs)
             for i in range(len(idxs)//self._batch_size):
                 ret.append( idxs[i*self._batch_size:(i+1)*self._batch_size])
-            if not self._drop_last:
-                ret.append( idxs[i*self._batch_size:])
+            if not self._drop_last and len(idxs) % self._batch_size != 0:
+                start_idx = (len(idxs)//self._batch_size)*self._batch_size
+                ret.append( idxs[start_idx:])
         if self._shuffle_batch:
             random.shuffle(ret)
         return iter(ret)

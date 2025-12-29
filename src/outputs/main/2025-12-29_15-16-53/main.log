@@ -1,0 +1,12 @@
+[2025-12-29 15:16:53,957][runners.base][INFO] - run eval
+[2025-12-29 15:16:53,966][datasets.tennis][INFO] - => Tennis loaded
+[2025-12-29 15:16:53,966][datasets.tennis][INFO] - Dataset statistics:
+[2025-12-29 15:16:53,966][datasets.tennis][INFO] - -------------------------------------------------------------------------------------
+[2025-12-29 15:16:53,966][datasets.tennis][INFO] - subset          | # batch | # frame | # frame w/ gt | # rally | # match | disp[pixel]
+[2025-12-29 15:16:53,967][datasets.tennis][INFO] - -------------------------------------------------------------------------------------
+[2025-12-29 15:16:53,967][datasets.tennis][INFO] - game_1_Clip1 |       3 |       9 |             9 |         |         | nan+/-nan
+[2025-12-29 15:16:53,968][datasets.tennis][INFO] - game_2_Clip1 |       3 |       9 |             9 |         |         | nan+/-nan
+[2025-12-29 15:16:53,968][datasets.tennis][INFO] - game_3_Clip1 |       3 |       9 |             9 |         |         | nan+/-nan
+[2025-12-29 15:16:53,968][datasets.tennis][INFO] - all         |       9 |      27 |            27 |       3 |         | nan+/-nan
+[2025-12-29 15:16:53,968][datasets.tennis][INFO] - -------------------------------------------------------------------------------------
+[2025-12-29 15:16:54,304][runners.eval][INFO] - eval @ match=game_1, clip=Clip1
