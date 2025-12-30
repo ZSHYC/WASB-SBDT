@@ -29,8 +29,11 @@ def get_clips(cfg, train_or_test='test', gt=True):
             clip_csv_path = osp.join(root_dir, match, clip_name, csv_filename)
             frame_names = []
             for frame_name in os.listdir(clip_dir):
-                if frame_name.endswith(ext):
-                    frame_names.append(frame_name)
+                try:
+                    if frame_name.lower().endswith(ext.lower()):
+                        frame_names.append(frame_name)
+                except Exception:
+                    continue
             frame_names.sort()
             ball_xyvs = load_csv(clip_csv_path, visible_flags) if gt else None
             clip_dict[(match, clip_name)] = {'clip_dir_or_path': clip_dir, 'clip_gt_dict': ball_xyvs, 'frame_names': frame_names}
@@ -55,7 +58,10 @@ class Tennis(object):
 
         self._frames_in  = cfg['model']['frames_in']
         self._frames_out = cfg['model']['frames_out']
-        self._step       = cfg['detector']['step']
+        try:
+            self._step       = cfg['detector']['step']
+        except Exception:
+            self._step = 1
 
         self._load_train      = cfg['dataloader']['train']
         self._load_test       = cfg['dataloader']['test']
@@ -66,6 +72,8 @@ class Tennis(object):
         self._train_clips      = {}
         self._train_clip_gts   = {}
         self._train_clip_disps = {}
+        self._train_clip_file_counts = {}
+        self._train_clip_csv_counts = {}
         if self._load_train or self._load_train_clip:
             train_outputs = self._gen_seq_list(self._train_matches, self._train_num_clip_ratio, self._train_refine_npz_path)
             self._train_all                = train_outputs['seq_list'] 
@@ -79,11 +87,15 @@ class Tennis(object):
                 self._train_clips      = train_outputs['clip_seq_list_dict']
                 self._train_clip_gts   = train_outputs['clip_seq_gt_dict_dict']
                 self._train_clip_disps = train_outputs['clip_seq_disps']
+            self._train_clip_file_counts = train_outputs.get('clip_file_counts', {})
+            self._train_clip_csv_counts = train_outputs.get('clip_csv_counts', {})
 
         self._test_all        = []
         self._test_clips      = {}
         self._test_clip_gts   = {}
         self._test_clip_disps = {}
+        self._test_clip_file_counts = {}
+        self._test_clip_csv_counts = {}
         if self._load_test or self._load_test_clip:
             test_outputs  = self._gen_seq_list(self._test_matches, self._test_num_clip_ratio, self._test_refine_npz_path)
             self._test_all                 = test_outputs['seq_list']
@@ -97,6 +109,8 @@ class Tennis(object):
                 self._test_clips               = test_outputs['clip_seq_list_dict']
                 self._test_clip_gts            = test_outputs['clip_seq_gt_dict_dict']
                 self._test_clip_disps          = test_outputs['clip_seq_disps']
+            self._test_clip_file_counts    = test_outputs.get('clip_file_counts', {})
+            self._test_clip_csv_counts     = test_outputs.get('clip_csv_counts', {})
 
         # show stats
         log.info('=> Tennis loaded' )
@@ -107,51 +121,47 @@ class Tennis(object):
         if self._load_train:
             log.info("train           | {:7d} | {:7d} | {:13d} | {:7d} | {:7d} | {:2.1f}+/-{:2.1f}".format(len(self._train_all), self._train_num_frames, self._train_num_frames_with_gt, self._train_num_rallies, self._train_num_matches, self._train_disp_mean, self._train_disp_std ) )
         if self._load_train_clip:
-            num_items_all          = 0
-            num_frames_all         = 0
-            num_frames_with_gt_all = 0
-            num_clips_all          = 0
-            disps_all              = []
+            num_items_all    = 0
+            num_files_all    = 0
+            num_csv_all      = 0
+            num_clips_all    = 0
+            disps_all        = []
             for key, clip in self._train_clips.items():
                 num_items  = len(clip)
-                num_frames = 0
-                for tmp in clip:
-                    num_frames += len( tmp['frames'] )
-                num_frames_with_gt = num_frames
                 clip_name = '{}_{}'.format(key[0], key[1])
                 disps     = np.array( self._train_clip_disps[key] )
-                log.info("{} | {:7d} | {:7d} | {:13d} |         |         | {:2.1f}+/-{:2.1f}".format(clip_name, num_items, num_frames, num_frames_with_gt, np.mean(disps), np.std(disps) ))
-            
-                num_items_all          += num_items
-                num_frames_all         += num_frames
-                num_frames_with_gt_all += num_frames_with_gt
+                file_count = self._train_clip_file_counts.get(key, 0)
+                csv_count  = self._train_clip_csv_counts.get(key, 0)
+                log.info("{} | {:7d} | {:7d} | {:13d} |         |         | {:2.1f}+/-{:2.1f}".format(clip_name, num_items, file_count, csv_count, np.mean(disps), np.std(disps) ))
+
+                num_items_all += num_items
+                num_files_all += file_count
+                num_csv_all   += csv_count
                 disps_all.extend(disps)
                 num_clips_all += 1
-            log.info("all         | {:7d} | {:7d} | {:13d} | {:7d} |         | {:2.1f}+/-{:2.1f}".format(num_items_all, num_frames_all, num_frames_with_gt_all, num_clips_all, np.mean(disps_all), np.std(disps_all) ))
+            log.info("all         | {:7d} | {:7d} | {:13d} | {:7d} |         | {:2.1f}+/-{:2.1f}".format(num_items_all, num_files_all, num_csv_all, num_clips_all, np.mean(disps_all), np.std(disps_all) ))
         if self._load_test:
             log.info("test            | {:7d} | {:7d} | {:13d} | {:7d} | {:7d} | {:2.1f}+/-{:2.1f}".format(len(self._test_all), self._test_num_frames, self._test_num_frames_with_gt, self._test_num_rallies, self._test_num_matches, self._test_disp_mean, self._test_disp_std) )
         if self._load_test_clip:
-            num_items_all          = 0
-            num_frames_all         = 0
-            num_frames_with_gt_all = 0
-            num_clips_all          = 0
-            disps_all              = []
+            num_items_all    = 0
+            num_files_all    = 0
+            num_csv_all      = 0
+            num_clips_all    = 0
+            disps_all        = []
             for key, test_clip in self._test_clips.items():
                 num_items  = len(test_clip)
-                num_frames = 0
-                for tmp in test_clip:
-                    num_frames += len( tmp['frames'] )
-                num_frames_with_gt = num_frames
                 clip_name = '{}_{}'.format(key[0], key[1])
                 disps     = np.array( self._test_clip_disps[key] )
-                log.info("{} | {:7d} | {:7d} | {:13d} |         |         | {:2.1f}+/-{:2.1f}".format(clip_name, num_items, num_frames, num_frames_with_gt, np.mean(disps), np.std(disps) ))
-            
-                num_items_all          += num_items
-                num_frames_all         += num_frames
-                num_frames_with_gt_all += num_frames_with_gt
+                file_count = self._test_clip_file_counts.get(key, 0)
+                csv_count  = self._test_clip_csv_counts.get(key, 0)
+                log.info("{} | {:7d} | {:7d} | {:13d} |         |         | {:2.1f}+/-{:2.1f}".format(clip_name, num_items, file_count, csv_count, np.mean(disps), np.std(disps) ))
+
+                num_items_all += num_items
+                num_files_all += file_count
+                num_csv_all   += csv_count
                 disps_all.extend(disps)
                 num_clips_all += 1
-            log.info("all         | {:7d} | {:7d} | {:13d} | {:7d} |         | {:2.1f}+/-{:2.1f}".format(num_items_all, num_frames_all, num_frames_with_gt_all, num_clips_all, np.mean(disps_all), np.std(disps_all) ))
+            log.info("all         | {:7d} | {:7d} | {:13d} | {:7d} |         | {:2.1f}+/-{:2.1f}".format(num_items_all, num_files_all, num_csv_all, num_clips_all, np.mean(disps_all), np.std(disps_all) ))
         log.info("-------------------------------------------------------------------------------------")
 
     def _gen_seq_list(self, 
@@ -171,6 +181,8 @@ class Tennis(object):
         clip_seq_list_dict    = {}
         clip_seq_gt_dict_dict = {}
         clip_seq_disps        = {}
+        clip_file_counts      = {}
+        clip_csv_counts       = {}
         num_frames         = 0
         num_matches        = len(matches)
         num_rallies        = 0
@@ -190,11 +202,18 @@ class Tennis(object):
                 ball_xyvs = load_csv(clip_csv_path, self._visible_flags, frame_dir=clip_frame_dir)
                 frame_names = []
                 for frame_name in os.listdir(clip_frame_dir):
-                    if frame_name.endswith(self._ext):
-                        frame_names.append(frame_name)
+                    try:
+                        if frame_name.lower().endswith(self._ext.lower()):
+                            frame_names.append(frame_name)
+                    except Exception:
+                        continue
                 frame_names.sort()
                 num_frames         += len(frame_names)
                 num_frames_with_gt += len(ball_xyvs)
+
+                # 保存每个 clip 的原始文件计数与 CSV (gt) 行数，供日志使用
+                clip_file_counts[(match, clip_name)] = len(frame_names)
+                clip_csv_counts[(match, clip_name)] = len(ball_xyvs)
                 
                 if refine_npz_path is not None:
                     ball_xyvs = refine_gt_clip(ball_xyvs, clip_frame_dir, frame_names, refine_npz_path)
@@ -276,17 +295,20 @@ class Tennis(object):
                 clip_seq_list_dict[(match, clip_name)]    = clip_seq_list
                 clip_seq_gt_dict_dict[(match, clip_name)] = clip_seq_gt_dict
                 clip_seq_disps[(match, clip_name)]         = clip_disps
+                # clip_file_counts & clip_csv_counts 已在上方设置
 
         return { 'seq_list': seq_list, 
-                 'clip_seq_list_dict': clip_seq_list_dict, 
-                 'clip_seq_gt_dict_dict': clip_seq_gt_dict_dict,
-                 'clip_seq_disps': clip_seq_disps,
-                 'num_frames': num_frames, 
-                 'num_frames_with_gt': num_frames_with_gt, 
-                 'num_matches': num_matches, 
-                 'num_rallies': num_rallies,
-                 'disp_mean': np.mean(np.array(disps)),
-                 'disp_std': np.std(np.array(disps))}
+             'clip_seq_list_dict': clip_seq_list_dict, 
+             'clip_seq_gt_dict_dict': clip_seq_gt_dict_dict,
+             'clip_seq_disps': clip_seq_disps,
+             'clip_file_counts': clip_file_counts,
+             'clip_csv_counts': clip_csv_counts,
+             'num_frames': num_frames, 
+             'num_frames_with_gt': num_frames_with_gt, 
+             'num_matches': num_matches, 
+             'num_rallies': num_rallies,
+             'disp_mean': np.mean(np.array(disps)),
+             'disp_std': np.std(np.array(disps))}
     @property
     def train(self):
         return self._train_all

@@ -28,4 +28,4 @@ if __name__ == "__main__":
 
 # # cd d:\Personal\Desktop\WASB-SBDT\src
 
-#  python main.py --config-name=eval dataset=tennis_predict model=wasb detector.model_path=../pretrained_weights/wasb_tennis_best.pth.tar runner.split=test runner.vis_result=True runner.vis_hm=True runner.vis_traj=True detector.step=1
+#  python main.py --config-name=eval dataset=tennis_predict model=wasb detector.model_path=../pretrained_weights/wasb_tennis_best.pth.tar runner.split=test runner.vis_result=True runner.vis_hm=True detector.step=1
