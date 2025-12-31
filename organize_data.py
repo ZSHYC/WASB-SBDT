@@ -2,68 +2,61 @@ import os
 import shutil
 from pathlib import Path
 
-# 配置路径
-base_dir = ".\datasets"  # 你的根目录
-source_dir = os.path.join(base_dir, "tennis_predict")  # 原始数据目录（需要被改变结构的目录）
-target_dir = os.path.join(base_dir, "tennis_predict0")  # 目标目录（从中复制Label.csv的目录）
+def organize_frames(base_path):
+    """
+    重新组织frames文件夹中的数据结构
+    1. 按 game_1, game_2, game_3... 的形式重命名子文件夹
+    2. 在每个子文件夹下创建Clip1文件夹
+    3. 将所有jpg文件移动到Clip1/下
+    4. 将Clip1中的jpg文件按 img_1, img_2, img_3... 形式重命名
+    """
+    base_path = Path(base_path)
+    
+    # 获取所有子文件夹列表
+    subfolders = [f for f in base_path.iterdir() if f.is_dir()]
+    
+    for idx, subfolder in enumerate(subfolders, start=1):
+        # 新的文件夹名称
+        new_folder_name = f"game_{idx}"
+        new_folder_path = base_path / new_folder_name
+        
+        # 重命名文件夹
+        print(f"重命名文件夹: {subfolder.name} -> {new_folder_name}")
+        subfolder.rename(new_folder_path)
+        
+        # 创建Clip1文件夹
+        clip1_path = new_folder_path / "Clip1"
+        clip1_path.mkdir(exist_ok=True)
+        
+        # 获取所有jpg文件并按原名排序（确保重命名顺序一致）
+        jpg_files = sorted([f for f in new_folder_path.iterdir() if f.is_file() and f.suffix.lower() == '.jpg'])
+        
+        # 将所有jpg文件移动到Clip1文件夹并重命名
+        for jdx, jpg_file in enumerate(jpg_files, start=1):
+            new_jpg_name = f"img_{jdx}.jpg"
+            destination = clip1_path / new_jpg_name
+            print(f"  移动并重命名 {jpg_file.name} -> Clip1/{new_jpg_name}")
+            shutil.move(str(jpg_file), str(destination))
+        
+        # 删除新文件夹中除了Clip1外的所有其他文件和文件夹
+        for item in new_folder_path.iterdir():
+            if item.is_dir() and item.name != "Clip1":
+                print(f"  删除文件夹: {item.name}")
+                shutil.rmtree(item)
+            elif item.is_file():
+                print(f"  删除文件: {item.name}")
+                item.unlink()
+        
+        print(f"完成处理: {new_folder_name}\n")
 
-# 检查源目录是否存在
-if not os.path.exists(source_dir):
-    raise FileNotFoundError(f"Source directory {source_dir} does not exist")
-
-# 检查目标目录是否存在
-if not os.path.exists(target_dir):
-    raise FileNotFoundError(f"Target directory {target_dir} does not exist")
-
-# 从 tennis_predict0 的 game_1 的 Clip_1 中找到 Label.csv
-label_source = None
-game1_path = os.path.join(target_dir, "game_1")
-if os.path.exists(game1_path):
-    clip1_path = os.path.join(game1_path, "Clip_1")
-    if os.path.exists(clip1_path):
-        potential_label = os.path.join(clip1_path, "Label.csv")
-        if os.path.exists(potential_label):
-            label_source = potential_label
-
-if not label_source:
-    # 如果在 game_1/Clip_1 中没找到，尝试在目标目录的其他地方查找
-    for root, dirs, files in os.walk(target_dir):
-        for file in files:
-            if file.lower() == 'label.csv':
-                label_source = os.path.join(root, file)
-                break
-        if label_source:
-            break
-
-if not label_source:
-    raise FileNotFoundError(f"Label.csv not found in target directory {target_dir} or its subdirectories")
-
-print(f"Found Label.csv at: {label_source}")
-
-# 遍历 tennis_predict 下的所有 game_X 文件夹
-for game_folder in os.listdir(source_dir):
-    game_path = os.path.join(source_dir, game_folder)
-    if not os.path.isdir(game_path):
-        continue
-
-    # 创建对应的结构：tennis_predict/game_X/Clip_1
-    clip_path = os.path.join(game_path, "Clip_1")
-    os.makedirs(clip_path, exist_ok=True)
-
-    # 移动图片文件（假设是 img_000000.jpg 到 img_000010.jpg）
-    image_files = [f"img_{i:06d}.jpg" for i in range(11)]
-    for img_file in image_files:
-        src_img = os.path.join(game_path, img_file)  # 从原始 game 文件夹中找图片
-        dst_img = os.path.join(clip_path, img_file)  # 移动到 Clip_1 子文件夹中
-        if os.path.exists(src_img):
-            shutil.move(src_img, dst_img)  # 使用 move 而不是 copy2，这样会移动而不是复制
-            print(f"Moved {src_img} to {dst_img}")
-        else:
-            print(f"Warning: {src_img} not found, skipping.")
-
-    # 从 tennis_predict0 复制 Label.csv 到当前 game 的 Clip_1 文件夹
-    dst_label = os.path.join(clip_path, "Label.csv")
-    shutil.copy2(label_source, dst_label)
-    print(f"Copied {label_source} to {dst_label}")
-
-print("文件夹结构改变完成！")
+if __name__ == "__main__":
+    # 设置基础路径
+    base_path = "datasets/1"
+    
+    # 确认路径存在
+    if not os.path.exists(base_path):
+        print(f"错误: 路径 {base_path} 不存在")
+    else:
+        # 执行组织操作
+        organize_frames(base_path)
+        print("数据结构转换完成！")
