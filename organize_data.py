@@ -51,8 +51,8 @@ def organize_frames(base_path):
 
 if __name__ == "__main__":
     # 设置基础路径
-    # base_path = "datasets/3"
-    base_path = r"D:\Personal\Desktop\qingzhen"
+    base_path = "datasets\\tennis_predict"
+    # base_path = r"D:\Personal\Desktop\"
     
     # 确认路径存在
     if not os.path.exists(base_path):
