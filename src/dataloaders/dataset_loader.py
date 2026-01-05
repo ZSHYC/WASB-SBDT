@@ -114,15 +114,6 @@ class ImageDataset(Dataset):
 
         for idx, img_path in enumerate(img_paths):
             img = read_image(img_path)
-            # pre-resize large inference images to match training resolution
-            if self._pre_resize is not None:
-                try:
-                    new_w, new_h = self._pre_resize
-                    img_np = np.array(img)
-                    img_np = cv2.resize(img_np, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-                    img = Image.fromarray(img_np)
-                except Exception as e:
-                    log.warning(f'pre_resize failed for {img_path}: {e}')
             
             if trans_input is None:
                 trans_input  = get_transform(np.asarray(img), self._input_wh)
